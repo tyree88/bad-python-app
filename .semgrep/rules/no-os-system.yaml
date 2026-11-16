@@ -1,0 +1,14 @@
+rules:
+  - id: python-no-os-system
+    languages: [python]
+    severity: WARNING
+    message: >-
+      This evaluation policy prohibits os.system because it executes through a shell.
+      Use shutil for file operations, or subprocess.run with an argument list,
+      a fixed executable, and validated arguments.
+    metadata:
+      category: security
+      technology: [python]
+      confidence: HIGH
+      cwe: 'CWE-78: Improper Neutralization of Special Elements used in an OS Command'
+    pattern: os.system(...)

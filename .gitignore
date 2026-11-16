@@ -6,3 +6,9 @@ static/uploads/*
 !static/uploads/.gitkeep
 __pycache__
 .DS_Store
+
+# Local evaluation reports and credentials
+semgrep-results.*
+semgrep-platform.*
+.env
+.env.*

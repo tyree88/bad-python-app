@@ -1,3 +1,7 @@
+## Semgrep CI evaluation
+
+See [the evaluation guide](docs/SEMGREP-EVALUATION.md) for repository findings, local scans, GitHub Actions, the failing-PR/fixed-PR exercise, and optional AppSec Platform setup. The application is intentionally vulnerable; scans do not require running it.
+
 ## Setup
 
 ### Requisites

@@ -1,0 +1,103 @@
+name: Semgrep evaluation
+
+on:
+  pull_request: {}
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: semgrep-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  community:
+    name: Semgrep gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    container:
+      # Match the locally validated CLI; update deliberately and repeat the evaluation.
+      image: semgrep/semgrep:1.183.0@sha256:2e45517a85e13a9cca14a2a00df6bb48affd66b8ebfae1b0991cd57578362fb0
+    env:
+      SEMGREP_SEND_METRICS: 'off'
+      SEMGREP_ENABLE_VERSION_CHECK: '0'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Test custom rule
+        run: semgrep --test --config .semgrep/rules .semgrep/tests
+
+      - name: Scan baseline or new PR findings
+        run: >-
+          semgrep ci
+          --no-suppress-errors
+          --audit-on=push
+          --audit-on=workflow_dispatch
+          --exclude=.semgrep/tests
+          --exclude=static/assets
+          --json-output=semgrep-results.json
+          --sarif-output=semgrep-results.sarif
+        env:
+          SEMGREP_RULES: p/default .semgrep/rules
+
+      - name: Retain scan reports, including failed scans
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: semgrep-community-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            semgrep-results.json
+            semgrep-results.sarif
+          if-no-files-found: warn
+          retention-days: 7
+
+  platform:
+    name: Semgrep AppSec Platform
+    # Enable only after adding the token and configuring the project's platform policy.
+    # Fork and Dependabot PRs cannot access the repository secret.
+    if: >-
+      vars.SEMGREP_PLATFORM_ENABLED == 'true' &&
+      github.actor != 'dependabot[bot]' &&
+      (github.event_name != 'pull_request' ||
+       github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    container:
+      image: semgrep/semgrep:1.183.0@sha256:2e45517a85e13a9cca14a2a00df6bb48affd66b8ebfae1b0991cd57578362fb0
+    env:
+      SEMGREP_SEND_METRICS: 'off'
+      SEMGREP_ENABLE_VERSION_CHECK: '0'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Scan using platform policies
+        run: |
+          if [ -z "$SEMGREP_APP_TOKEN" ]; then
+            echo '::error::Add SEMGREP_APP_TOKEN before enabling the platform job.'
+            exit 1
+          fi
+          semgrep ci --no-suppress-errors --audit-on=push --audit-on=workflow_dispatch \
+            --exclude=.semgrep/tests --exclude=static/assets \
+            --json-output=semgrep-platform.json --sarif-output=semgrep-platform.sarif
+        env:
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+
+      - name: Retain platform scan reports
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: semgrep-platform-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            semgrep-platform.json
+            semgrep-platform.sarif
+          if-no-files-found: warn
+          retention-days: 7
