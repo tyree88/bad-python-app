@@ -11,7 +11,7 @@ from vulns.iframe_injection.iframe_injection import iframe_injection_page
 from util import get_root_dir
 from db_helper import db_helper
 from db_models import db_models
-from middlewares import require_api_key
+from middlewares import require_api_key, require_admin
 
 
 app = Flask(__name__)
@@ -39,6 +39,7 @@ def home():
 
 
 @app.route('/reset-database', methods=['POST'])
+@require_admin
 def reset_database():
     db_helper.reset_database()
     return redirect(url_for('home', reset_db=1))
